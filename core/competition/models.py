@@ -66,6 +66,7 @@ class Stage(models.Model):
 class Group(models.Model):
     grop_name = models.CharField(max_length=100)
     stage = models.ForeignKey(Stage, on_delete=models.SET_NULL, null=True)
+    gender = models.ForeignKey(Gender, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return self.grop_name
@@ -76,12 +77,17 @@ class Cart(models.Model):
     competitor = models.ForeignKey(Competitor, on_delete=models.SET_NULL, null=True)
     bib_number = models.IntegerField(blank=True, null=True)
 
+class Status(models.Model):
+    status = models.CharField(max_length=10, default='Active')
 
+    def __str__(self):
+        return self.status
+    
 class Results(models.Model):
     place = models.IntegerField(null=True, blank=True)
-    competitor = models.ForeignKey(Competitor, on_delete=models.SET_NULL, null=True)
-    competition = models.ForeignKey(Cart,  on_delete=models.SET_NULL, null=True)
-    run1 = models.CharField(max_length=50, null=True, blank=True)
+    competitor = models.ForeignKey(Cart,  on_delete=models.SET_NULL, null=True)
+    status = models.ForeignKey(Status, null=True, on_delete=models.SET_NULL)
+    run1 = models.CharField(max_length=50, null=True, blank=True) 
     run2 = models.CharField(max_length=50, null=True, blank=True)
     run_total = models.CharField(max_length=50, null=True, blank=True)
     point = models.IntegerField(null=True, blank=True)

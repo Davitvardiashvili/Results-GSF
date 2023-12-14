@@ -1,6 +1,12 @@
 from rest_framework import serializers
 from .models import *
 from datetime import datetime, timedelta
+from rest_framework.authtoken.models import Token
+
+class TokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Token
+        fields = ('key',)
 
 class SchoolSerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,12 +55,31 @@ class CartSerializer(serializers.ModelSerializer):
         model = Cart
         fields = '__all__'
 
+    def validate(self, data):
+        """
+        Check that the competition and competitor combination is unique.
+        """
+        group_id = data.get('group')
+        competitor_id = data.get('competitor')
+
+        # Check if we're creating a new instance or updating an existing one
+        if not self.instance:
+            # This is a new instance, so we check if the combination already exists
+            if Cart.objects.filter(group_id=group_id, competitor_id=competitor_id).exists():
+                raise serializers.ValidationError("A result for this group and competitor already exists.")
+        else:
+            # This is an update, check if the combination exists elsewhere
+            if Cart.objects.exclude(pk=self.instance.pk).filter(group_id=group_id, competitor_id=competitor_id).exists():
+                raise serializers.ValidationError("A result for this group and competitor already exists with a different ID.")
+
+        return data
+
 
 class ResultsSerializer(serializers.ModelSerializer):
-    competitor_detail = CompetitorSerializer(source='competitor', read_only=True)
+    cart_detail = CartSerializer(source='competitor', read_only=True)
     class Meta:
         model = Results
-        fields = ['competitor','competitor_detail', 'competition', 'run1', 'run2']
+        fields = '__all__'
 
 
 
@@ -62,32 +87,36 @@ class ResultsSerializer(serializers.ModelSerializer):
         """
         Check that the competition and competitor combination is unique.
         """
-        competition_id = data.get('competition')
         competitor_id = data.get('competitor')
 
         # Check if we're creating a new instance or updating an existing one
         if not self.instance:
             # This is a new instance, so we check if the combination already exists
-            if Results.objects.filter(competition_id=competition_id, competitor_id=competitor_id).exists():
-                raise serializers.ValidationError("A result for this competition and competitor already exists.")
+            if Results.objects.filter(competitor_id=competitor_id).exists():
+                raise serializers.ValidationError("A result for this competitor already exists.")
         else:
             # This is an update, check if the combination exists elsewhere
-            if Results.objects.exclude(pk=self.instance.pk).filter(competition_id=competition_id, competitor_id=competitor_id).exists():
-                raise serializers.ValidationError("A result for this competition and competitor already exists with a different ID.")
+            if Results.objects.exclude(pk=self.instance.pk).filter(competitor_id=competitor_id).exists():
+                raise serializers.ValidationError("A result for this competitor already exists with a different ID.")
 
         return data
 
     def to_representation(self, instance):
-        ret = super().to_representation(instance)
-        # Add any additional fields you want to include in read operations
+        response = super().to_representation(instance)
+        competitor = instance.competitor.competitor  # Access the Competitor from the Cart instance
+        competitor_serializer = CompetitorSerializer(competitor)
+        response['competitor'] = competitor_serializer.data  # Replace the competitor ID with detailed info
 
-        ret['id'] = instance.id
-        ret['place'] = instance.place
-        ret['run_total'] = instance.run_total
-        ret['point'] = instance.point
-        ret['season_point'] = instance.season_point
-        # You can add more fields if needed
-        return ret
+        # Include other fields from Results model
+        response['id'] = instance.id
+        response['place'] = instance.place
+        response['run1'] = instance.run1
+        response['run2'] = instance.run2
+        response['run_total'] = instance.run_total
+        response['point'] = instance.point
+        response['season_point'] = instance.season_point
+
+        return response
 
     def validate_time(self, time_str):
         # Split the string into its components
@@ -113,16 +142,53 @@ class ResultsSerializer(serializers.ModelSerializer):
         return run_total_str
 
     def update(self, instance, validated_data):
+        # Assuming run1 and run2 are provided in the correct format 'mm:ss,00'
         run1 = validated_data.get('run1', instance.run1)
-        run2 = validated_data.get('run2')
+        run2 = validated_data.get('run2', instance.run2)
 
-        # Check if run2 is provided and is not None
-        if run2 is not None:
+        # Check if both runs are provided
+        if run1 and run2:
+            # Calculate run_total
             run_total = self.sum_times(run1, run2)
-        else:
-            run_total = run1
-
-        validated_data['run_total'] = run_total
+            validated_data['run_total'] = run_total
+        elif run1:
+            validated_data['run_total'] = run1
+        elif run2:
+            validated_data['run_total'] = run2
 
         # Now let the base class handle the actual update
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+
+        # After updating, recalculate the placements
+        self.recalculate_placements(instance)
+
+        return instance
+
+    def recalculate_placements(self, instance):
+        # Get all the results in the same group as the current instance
+        group_results = Results.objects.filter(
+            competitor__group=instance.competitor.group,
+            run_total__isnull=False
+        ).exclude(
+            id=instance.id  # Exclude the current instance
+        )
+
+        # Add the current instance to the list and sort by run_total
+        all_results = list(group_results) + [instance]
+        all_results.sort(key=lambda x: self.validate_time(x.run_total))
+
+        # Update the placement
+        for idx, result in enumerate(all_results, 1):
+            result.place = idx
+            result.save(update_fields=['place'])
+
+
+
+class RandomizeBibNumbersSerializer(serializers.Serializer):
+    start_number = serializers.IntegerField(default=1)
+    ignore_numbers = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False
+    )
+    stage=serializers.IntegerField(required=True)
+    gender = serializers.IntegerField(required=True)

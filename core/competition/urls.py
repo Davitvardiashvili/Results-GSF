@@ -1,8 +1,10 @@
 from django.urls import re_path, include,path
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
+from rest_framework import permissions
 from drf_yasg import openapi
 from .views import *
+from rest_framework.authtoken.views import obtain_auth_token
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -12,9 +14,11 @@ schema_view = get_schema_view(
         terms_of_service="https://www.google.com/policies/terms/",
         contact=openapi.Contact(email="contact@yourapi.com"),
         license=openapi.License(name="BSD License"),
+        # Define security settings within the openapi.Info
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    # The security scheme is defined outside of the openapi.Info
 )
 
 
@@ -35,6 +39,11 @@ urlpatterns = [
     path('cart/<int:pk>/', CartRetrieveUpdateDestroy.as_view(), name='cart-detail'),
     path('results/', ResultsListCreate.as_view(), name='results'),
     path('results/<int:pk>/', ResultsRetrieveUpdateDestroy.as_view(), name='results-detail'),
+    path('randomizer/', randomize_bib_numbers, name='randomize-bib'),
+    path('api-token-auth/', ObtainAuthTokenView.as_view(), name='api_token_auth'),
+    path('logout/', LogoutView.as_view(), name='logout'),
+    path('sync/', SyncCartToResultsView.as_view(), name='sync'),
+
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     re_path(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

@@ -21,36 +21,56 @@ class GenderSerialize(serializers.ModelSerializer):
 
 
 class CompetitorSerializer(serializers.ModelSerializer):
+    # Use distinct names for write-only and read-only representations
+    gender_id = serializers.PrimaryKeyRelatedField(
+        queryset=Gender.objects.all(), 
+        source='gender', 
+        write_only=True
+    )
+    school_id = serializers.PrimaryKeyRelatedField(
+        queryset=School.objects.all(), 
+        source='school', 
+        write_only=True
+    )
+    gender = serializers.CharField(source='gender.gender', read_only=True)
+    school = serializers.CharField(source='school.school_name', read_only=True)
+
     class Meta:
         model = Competitor
-        fields = '__all__'
+        fields = ['id', 'gender_id', 'name', 'surname', 'school_id', 'year', 'gender', 'school']
 
 
 class SeasonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Season
-        fields = '__all__'
+        fields = ['season']
 
 
 class DisciplineSerializer(serializers.ModelSerializer):
+    season = SeasonSerializer(read_only=True)  # Nested StageSerializer
     class Meta:
         model = Discipline
-        fields = '__all__'
+        fields = ['id','discipline', 'season']
 
 
 class StageSerializer(serializers.ModelSerializer):
+    discipline = DisciplineSerializer(read_only=True)  # Nested StageSerializer
     class Meta:
         model = Stage
-        fields = '__all__'
+        fields = ['id', 'discipline', 'period', 'name']
 
 
 class GroupSerializer(serializers.ModelSerializer):
+    stage = StageSerializer(read_only=True)  # Nested StageSerializer
+
+
     class Meta:
         model = Group
         fields = '__all__'
 
 
 class CartSerializer(serializers.ModelSerializer):
+    group = GroupSerializer(read_only=True)
     class Meta:
         model = Cart
         fields = '__all__'
@@ -77,6 +97,8 @@ class CartSerializer(serializers.ModelSerializer):
 
 class ResultsSerializer(serializers.ModelSerializer):
     cart_detail = CartSerializer(source='competitor', read_only=True)
+    status = serializers.CharField(source='status.status', read_only=True)
+
     class Meta:
         model = Results
         fields = '__all__'
@@ -103,9 +125,11 @@ class ResultsSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
-        competitor = instance.competitor.competitor  # Access the Competitor from the Cart instance
-        competitor_serializer = CompetitorSerializer(competitor)
-        response['competitor'] = competitor_serializer.data  # Replace the competitor ID with detailed info
+
+        competitor_serializer = CompetitorSerializer(instance.competitor.competitor)
+        response['competitor'] = competitor_serializer.data
+
+
 
         # Include other fields from Results model
         response['id'] = instance.id

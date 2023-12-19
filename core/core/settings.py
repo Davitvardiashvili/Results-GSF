@@ -35,6 +35,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'competition.middleware.RequestBodyLoggingMiddleware',
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -128,7 +129,19 @@ CORS_ALLOW_HEADERS = [
     "x-requested-with",
 ]
 
-
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
 
 LANGUAGE_CODE = 'en-us'
 

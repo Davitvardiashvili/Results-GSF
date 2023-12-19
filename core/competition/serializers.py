@@ -43,14 +43,22 @@ class CompetitorSerializer(serializers.ModelSerializer):
 class SeasonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Season
-        fields = ['season']
+        fields = ['id','season','created']
 
 
 class DisciplineSerializer(serializers.ModelSerializer):
-    season = SeasonSerializer(read_only=True)  # Nested StageSerializer
+    season_id = serializers.PrimaryKeyRelatedField(
+        queryset=Season.objects.all(),
+        source='season',
+        write_only=True,
+    )
+
+    # For read operations (GET)
+    season = SeasonSerializer(read_only=True)
+
     class Meta:
         model = Discipline
-        fields = ['id','discipline', 'season']
+        fields = ['id', 'discipline', 'season_id', 'season']
 
 
 class StageSerializer(serializers.ModelSerializer):

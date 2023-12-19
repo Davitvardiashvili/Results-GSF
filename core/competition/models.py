@@ -41,7 +41,7 @@ class Season(models.Model):
 
 
 class Discipline(models.Model):
-    discipline = models.CharField(unique=True, max_length=150)
+    discipline = models.CharField(max_length=150)
     season = models.ForeignKey(Season, on_delete=models.SET_NULL, null=True)
 
     updated = models.DateTimeField(auto_now=True)
@@ -74,7 +74,7 @@ class Group(models.Model):
 
 class Cart(models.Model):
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
-    competitor = models.ForeignKey(Competitor, on_delete=models.SET_NULL, null=True)
+    competitor = models.ForeignKey(Competitor, on_delete=models.CASCADE, null=True)
     bib_number = models.IntegerField(blank=True, null=True)
 
 class Status(models.Model):
@@ -85,7 +85,7 @@ class Status(models.Model):
     
 class Results(models.Model):
     place = models.IntegerField(null=True, blank=True)
-    competitor = models.ForeignKey(Cart,  on_delete=models.SET_NULL, null=True)
+    competitor = models.ForeignKey(Cart,  on_delete=models.CASCADE, null=True)
     status = models.ForeignKey(Status, null=True, on_delete=models.SET_NULL)
     run1 = models.CharField(max_length=50, null=True, blank=True) 
     run2 = models.CharField(max_length=50, null=True, blank=True)

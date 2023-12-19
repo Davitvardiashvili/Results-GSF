@@ -62,10 +62,16 @@ class DisciplineSerializer(serializers.ModelSerializer):
 
 
 class StageSerializer(serializers.ModelSerializer):
+    discipline_id = serializers.PrimaryKeyRelatedField(
+        queryset=Discipline.objects.all(),
+        source='discipline',
+        write_only=True,
+    )
+
     discipline = DisciplineSerializer(read_only=True)  # Nested StageSerializer
     class Meta:
         model = Stage
-        fields = ['id', 'discipline', 'period', 'name']
+        fields = ['id', 'discipline','discipline_id' ,'period', 'name']
 
 
 class GroupSerializer(serializers.ModelSerializer):

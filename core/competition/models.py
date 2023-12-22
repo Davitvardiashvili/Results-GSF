@@ -1,21 +1,33 @@
 from django.db import models
 
 
-class School(models.Model):
-    school_name = models.CharField(unique=True, max_length=60)
-    created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.school_name
-
-
 class Gender(models.Model):
     gender = models.CharField(unique=True, max_length=10)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.gender
+    
 
+class Status(models.Model):
+    status = models.CharField(max_length=10, default='Active')
+
+    def __str__(self):
+        return self.status
+    
+class Discipline(models.Model):
+    discipline = models.CharField(max_length=150)
+
+    def __str__(self):
+        return self.discipline
+
+
+class School(models.Model):
+    school_name = models.CharField(unique=True, max_length=60)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.school_name
 
 class Competitor(models.Model):
     name = models.CharField(max_length=50)
@@ -33,6 +45,7 @@ class Competitor(models.Model):
 
 class Season(models.Model):
     season = models.CharField(max_length=50)
+
     updated = models.DateTimeField(auto_now=True)
     created = models.DateTimeField(auto_now_add=True)
 
@@ -40,48 +53,43 @@ class Season(models.Model):
         return self.season
 
 
-class Discipline(models.Model):
-    discipline = models.CharField(max_length=150)
-    season = models.ForeignKey(Season, on_delete=models.SET_NULL, null=True)
-
-    updated = models.DateTimeField(auto_now=True)
-    created = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f'{self.season} - {self.discipline}'
-
-
 class Stage(models.Model):
     name = models.CharField(max_length=50)
-    discipline = models.ForeignKey(Discipline, on_delete=models.SET_NULL, null=True)
-    period = models.DateField()
+    season = models.ForeignKey(Season, on_delete=models.CASCADE)
 
     updated = models.DateTimeField(auto_now=True)
     created = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'{self.discipline} - {self.name} - {self.period}'
+        return f'{self.season} - {self.name}'
+
+class CompetitionDay(models.Model):
+    stage = models.ForeignKey(Stage, on_delete=models.CASCADE)
+    discipline = models.ForeignKey(Discipline, on_delete=models.CASCADE)
+    period = models.DateField()
+    
+    updated = models.DateTimeField(auto_now=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.stage} - {self.discipline}'
 
 
 class Group(models.Model):
-    grop_name = models.CharField(max_length=100)
-    stage = models.ForeignKey(Stage, on_delete=models.SET_NULL, null=True)
-    gender = models.ForeignKey(Gender, on_delete=models.SET_NULL, null=True)
+    competition = models.ForeignKey(CompetitionDay, on_delete=models.CASCADE)
+    group_name = models.CharField(max_length=100)
+    gender = models.ForeignKey(Gender, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.grop_name
 
 
 class Cart(models.Model):
-    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
     competitor = models.ForeignKey(Competitor, on_delete=models.CASCADE, null=True)
     bib_number = models.IntegerField(blank=True, null=True)
 
-class Status(models.Model):
-    status = models.CharField(max_length=10, default='Active')
 
-    def __str__(self):
-        return self.status
     
 class Results(models.Model):
     place = models.IntegerField(null=True, blank=True)

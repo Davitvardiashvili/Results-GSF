@@ -14,9 +14,15 @@ class SchoolSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class GenderSerialize(serializers.ModelSerializer):
+class GenderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Gender
+        fields = '__all__'
+
+
+class DisciplineSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Discipline
         fields = '__all__'
 
 
@@ -46,45 +52,72 @@ class SeasonSerializer(serializers.ModelSerializer):
         fields = ['id','season','created']
 
 
-class DisciplineSerializer(serializers.ModelSerializer):
+class StageSerializer(serializers.ModelSerializer):
     season_id = serializers.PrimaryKeyRelatedField(
         queryset=Season.objects.all(),
         source='season',
         write_only=True,
     )
-
-    # For read operations (GET)
     season = SeasonSerializer(read_only=True)
-
     class Meta:
-        model = Discipline
-        fields = ['id', 'discipline', 'season_id', 'season']
+        model = Stage
+        fields = ['id', 'season','season_id' ,'name']
 
 
-class StageSerializer(serializers.ModelSerializer):
+class CompetitionDaySerializer(serializers.ModelSerializer):
+    stage_id = serializers.PrimaryKeyRelatedField(
+        queryset=Stage.objects.all(),
+        source='stage',
+        write_only=True,
+    )
     discipline_id = serializers.PrimaryKeyRelatedField(
         queryset=Discipline.objects.all(),
         source='discipline',
         write_only=True,
     )
+    stage = StageSerializer(read_only=True) 
+    discipline = DisciplineSerializer(read_only=True) 
 
-    discipline = DisciplineSerializer(read_only=True)  # Nested StageSerializer
     class Meta:
-        model = Stage
-        fields = ['id', 'discipline','discipline_id' ,'period', 'name']
-
+        model = CompetitionDay
+        fields = ['id', 'discipline','discipline_id','period', 'stage_id', 'stage']
 
 class GroupSerializer(serializers.ModelSerializer):
-    stage = StageSerializer(read_only=True)  # Nested StageSerializer
+    gender_id = serializers.PrimaryKeyRelatedField(
+        queryset=Gender.objects.all(), 
+        source='gender', 
+        write_only=True
+    )
 
+    competition_id = serializers.PrimaryKeyRelatedField(
+        queryset=CompetitionDay.objects.all(), 
+        source='competition', 
+        write_only=True
+    )
+
+    competition = CompetitionDaySerializer(read_only=True)
+    gender = serializers.CharField(read_only=True)
 
     class Meta:
         model = Group
-        fields = '__all__'
+        fields = ['id', 'group_name', 'competition', 'competition_id', 'gender', 'gender_id']
 
 
 class CartSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
+    competitor_id = serializers.PrimaryKeyRelatedField(
+        queryset=Competitor.objects.all(), 
+        source='competitor', 
+        write_only=True
+    )
+
+    group_id = serializers.PrimaryKeyRelatedField(
+        queryset=Group.objects.all(), 
+        source='group', 
+        write_only=True
+    )
+    group = GroupSerializer(read_only=True)
+    competitor = CompetitorSerializer(read_only=True)
     class Meta:
         model = Cart
         fields = '__all__'
@@ -99,11 +132,11 @@ class CartSerializer(serializers.ModelSerializer):
         # Check if we're creating a new instance or updating an existing one
         if not self.instance:
             # This is a new instance, so we check if the combination already exists
-            if Cart.objects.filter(group_id=group_id, competitor_id=competitor_id).exists():
+            if Cart.objects.filter(group=group_id, competitor=competitor_id).exists():
                 raise serializers.ValidationError("A result for this group and competitor already exists.")
         else:
             # This is an update, check if the combination exists elsewhere
-            if Cart.objects.exclude(pk=self.instance.pk).filter(group_id=group_id, competitor_id=competitor_id).exists():
+            if Cart.objects.exclude(pk=self.instance.pk).filter(group=group_id, competitor=competitor_id).exists():
                 raise serializers.ValidationError("A result for this group and competitor already exists with a different ID.")
 
         return data

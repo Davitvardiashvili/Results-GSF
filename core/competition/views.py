@@ -85,6 +85,22 @@ class SchoolRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
 
+class DisciplineListCreate(generics.ListCreateAPIView):
+    queryset = Discipline.objects.all()
+    serializer_class = DisciplineSerializer
+    # Set different permissions for different request methods
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+
+class DisciplineRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Discipline.objects.all()
+    serializer_class = DisciplineSerializer
+    permission_classes = [IsAuthenticated]
+
+
 class CompetitorListCreate(generics.ListCreateAPIView):
     queryset = Competitor.objects.all()
     serializer_class = CompetitorSerializer
@@ -120,9 +136,9 @@ class SeasonRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
 
-class DisciplineListCreate(generics.ListCreateAPIView):
-    queryset = Discipline.objects.all()
-    serializer_class = DisciplineSerializer
+class CompetitionDayCreate(generics.ListCreateAPIView):
+    queryset = CompetitionDay.objects.all()
+    serializer_class = CompetitionDaySerializer
     # Set different permissions for different request methods
     def get_permissions(self):
         if self.request.method == 'GET':
@@ -130,9 +146,9 @@ class DisciplineListCreate(generics.ListCreateAPIView):
         return [IsAuthenticated()]
 
 
-class DisciplineRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Discipline.objects.all()
-    serializer_class = DisciplineSerializer
+class CompetitionDayRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
+    queryset = CompetitionDay.objects.all()
+    serializer_class = CompetitionDaySerializer
     permission_classes = [IsAuthenticated]
 
 

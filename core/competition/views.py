@@ -191,7 +191,11 @@ class GroupRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 class CartListCreate(generics.ListCreateAPIView):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
-    permission_classes = [IsAuthenticated]
+    # Set different permissions for different request methods
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
 
 class CartRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
@@ -218,36 +222,47 @@ class ResultsRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def randomize_bib_numbers(request):
-    # Parse and validate the request data using the serializer
     serializer = RandomizeBibNumbersSerializer(data=request.data)
     if serializer.is_valid():
-        # Extract validated data from the serializer
         start_number = serializer.validated_data.get('start_number')
         ignore_numbers = serializer.validated_data.get('ignore_numbers', [])
+        competition_id = serializer.validated_data.get('competition', None)
         gender_id = serializer.validated_data.get('gender', None)
-        stage_id = serializer.validated_data.get('stage',None)
-        
-        # Fetch carts based on the specified gender
-        stage_ids = Group.objects.filter(stage_id=stage_id).values_list('id', flat=True)
-        carts = Cart.objects.filter(group_id__in=stage_ids)
 
-        group_ids = Group.objects.filter(gender_id=gender_id).values_list('id', flat=True)
-        carts = carts.filter(group_id__in=group_ids)
+        # Fetch all groups for the specified competition and gender
+        groups = Group.objects.filter(competition_id=competition_id, gender_id=gender_id)
 
-        total_carts = carts.count()
-        potential_numbers = set(range(start_number, start_number + total_carts + len(ignore_numbers))) - set(ignore_numbers)
+        # Loop through each group to randomize bib numbers
+        for group in groups:
+            # Fetch carts for the current group
+            carts = Cart.objects.filter(group=group)
+            # Calculate the total number of carts in the group
+            total_carts = carts.count()
+            print(total_carts)
 
-        if len(potential_numbers) < total_carts:
-            return Response({"error": "Not enough unique numbers available after excluding the ignored numbers."}, status=400)
+            # Generate potential numbers for the current group
+            potential_numbers = set(range(start_number, start_number + total_carts)) - set(ignore_numbers)
+            print(potential_numbers)
 
-        for cart in carts:
-            cart.bib_number = random.choice(list(potential_numbers))
-            potential_numbers.remove(cart.bib_number)
-            cart.save()
+            # Check if there are enough unique numbers available
+            if len(potential_numbers) < total_carts:
+                return Response({"error": "Not enough unique numbers available after excluding the ignored numbers."}, status=400)
+
+            # Randomize bib numbers for carts in the current group
+            for cart in carts:
+                cart.bib_number = random.choice(list(potential_numbers))
+                potential_numbers.remove(cart.bib_number)
+                cart.save()
+
+            # Update start_number for the next group
+            start_number += total_carts
 
         return Response({"message": "Bib numbers randomized successfully"})
     else:
         return Response(serializer.errors, status=400)
+
+
+
 
 
 

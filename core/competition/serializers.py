@@ -261,5 +261,5 @@ class RandomizeBibNumbersSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         required=False
     )
-    stage=serializers.IntegerField(required=True)
+    competition=serializers.IntegerField(required=True)
     gender = serializers.IntegerField(required=True)

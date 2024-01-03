@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import *
 from datetime import datetime, timedelta
 from rest_framework.authtoken.models import Token
-
+from django.db.models import Sum
 class TokenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Token
@@ -145,11 +145,18 @@ class CartSerializer(serializers.ModelSerializer):
 class ResultsSerializer(serializers.ModelSerializer):
     cart_detail = CartSerializer(source='competitor', read_only=True)
     status = serializers.CharField(source='status.status', read_only=True)
-
-    class Meta:
-        model = Results
-        fields = '__all__'
-
+    status_id = serializers.PrimaryKeyRelatedField(
+        queryset=Status.objects.all(), 
+        source='status', 
+        write_only=False  # Allow both read and write operations
+    )
+    DNF_ID = 2
+    DNS_ID = 3
+    POINTS_TABLE = {
+        1: 25, 2: 20, 3: 15, 4: 12, 5: 11,
+        6: 10, 7: 9, 8: 8, 9: 7, 10: 6,
+        11: 5, 12: 4, 13: 3, 14: 2, 15: 1
+    }
 
 
     def validate(self, data):
@@ -213,46 +220,92 @@ class ResultsSerializer(serializers.ModelSerializer):
         return run_total_str
 
     def update(self, instance, validated_data):
-        # Assuming run1 and run2 are provided in the correct format 'mm:ss,00'
+        # Update run times
         run1 = validated_data.get('run1', instance.run1)
         run2 = validated_data.get('run2', instance.run2)
 
-        # Check if both runs are provided
+        # Calculate total run time if both runs are provided
         if run1 and run2:
-            # Calculate run_total
-            run_total = self.sum_times(run1, run2)
-            validated_data['run_total'] = run_total
+            instance.run_total = self.sum_times(run1, run2)
         elif run1:
-            validated_data['run_total'] = run1
+            instance.run_total = run1
         elif run2:
-            validated_data['run_total'] = run2
+            instance.run_total = run2
 
-        # Now let the base class handle the actual update
-        instance = super().update(instance, validated_data)
+        # Update status and set points accordingly
+        status = validated_data.get('status')
+        if status:
+            instance.status = status
+            if status.id in [self.DNF_ID, self.DNS_ID]:
+                instance.point = 0
+                instance.place = 999  # Temporary high value
+            else:
+                # Normal point calculation
+                instance.point = self.POINTS_TABLE.get(instance.place, 0)
 
-        # After updating, recalculate the placements
+        # Save the instance with updated data
+        instance.save()
+
+        # Recalculate placements and season points for the group
         self.recalculate_placements(instance)
+        competitor_id = instance.competitor.competitor.id
+        season_id = instance.competitor.group.competition.stage.season.id
+        self.recalculate_season_points(competitor_id, season_id)
+        self.recalculate_all_season_points(season_id)
 
         return instance
 
+
+
     def recalculate_placements(self, instance):
-        # Get all the results in the same group as the current instance
-        group_results = Results.objects.filter(
-            competitor__group=instance.competitor.group,
-            run_total__isnull=False
-        ).exclude(
-            id=instance.id  # Exclude the current instance
-        )
+        all_results = Results.objects.filter(
+            competitor__group=instance.competitor.group
+        ).order_by('run_total')
 
-        # Add the current instance to the list and sort by run_total
-        all_results = list(group_results) + [instance]
-        all_results.sort(key=lambda x: self.validate_time(x.run_total))
+        # Assign new placements, pushing DNF and DNS to the end
+        normal_placement = 1
+        disqualified_placement = len(all_results) + 1  # Start from the end
 
-        # Update the placement
-        for idx, result in enumerate(all_results, 1):
-            result.place = idx
-            result.save(update_fields=['place'])
+        for result in all_results:
+            if result.status.id in [self.DNF_ID, self.DNS_ID]:
+                result.place = disqualified_placement
+                disqualified_placement += 1
+            else:
+                result.place = normal_placement
+                normal_placement += 1
 
+            # Update points for non-disqualified competitors
+            if result.status.id not in [self.DNF_ID, self.DNS_ID]:
+                result.point = self.POINTS_TABLE.get(result.place, 0)
+
+            result.save(update_fields=['place', 'point'])
+
+    def recalculate_season_points(self, competitor_id, season_id):
+        # Sum all points earned by this competitor in this season
+        season_points = Results.objects.filter(
+            competitor__competitor__id=competitor_id, 
+            competitor__group__competition__stage__season__id=season_id
+        ).aggregate(Sum('point'))['point__sum'] or 0
+
+        # Update the season points for this competitor in all their results this season
+        Results.objects.filter(
+            competitor__competitor__id=competitor_id,
+            competitor__group__competition__stage__season__id=season_id
+        ).update(season_point=season_points)
+
+
+    def recalculate_all_season_points(self, season_id):
+        # Fetch all competitors in the season
+        competitors_in_season = Competitor.objects.filter(
+            cart__group__competition__stage__season__id=season_id
+        ).distinct()
+
+        # Recalculate season points for each competitor
+        for competitor in competitors_in_season:
+            self.recalculate_season_points(competitor.id, season_id)
+    class Meta:
+        model = Results
+        fields = '__all__'
 
 
 class RandomizeBibNumbersSerializer(serializers.Serializer):
@@ -263,3 +316,5 @@ class RandomizeBibNumbersSerializer(serializers.Serializer):
     )
     competition=serializers.IntegerField(required=True)
     gender = serializers.IntegerField(required=True)
+
+

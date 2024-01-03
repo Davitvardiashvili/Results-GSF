@@ -45,6 +45,8 @@ urlpatterns = [
     path('api-token-auth/', ObtainAuthTokenView.as_view(), name='api_token_auth'),
     path('logout/', LogoutView.as_view(), name='logout'),
     path('sync/', SyncCartToResultsView.as_view(), name='sync'),
+    path('download_excel/', download_excel, name='download_excel'),
+    path('batch_sync_results/', batch_sync_results, name='batch-sync-results'),
 
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

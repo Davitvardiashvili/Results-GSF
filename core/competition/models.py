@@ -81,7 +81,7 @@ class Group(models.Model):
     gender = models.ForeignKey(Gender, on_delete=models.CASCADE)
 
     def __str__(self):
-        return self.grop_name
+        return self.group_name
 
 
 class Cart(models.Model):
@@ -94,7 +94,7 @@ class Cart(models.Model):
 class Results(models.Model):
     place = models.IntegerField(null=True, blank=True)
     competitor = models.ForeignKey(Cart,  on_delete=models.CASCADE, null=True)
-    status = models.ForeignKey(Status, null=True, on_delete=models.SET_NULL)
+    status = models.ForeignKey(Status, null=True, on_delete=models.SET_NULL, default=1)
     run1 = models.CharField(max_length=50, null=True, blank=True) 
     run2 = models.CharField(max_length=50, null=True, blank=True)
     run_total = models.CharField(max_length=50, null=True, blank=True)

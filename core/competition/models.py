@@ -8,12 +8,6 @@ class Gender(models.Model):
     def __str__(self):
         return self.gender
     
-
-class Status(models.Model):
-    status = models.CharField(max_length=10, default='Active')
-
-    def __str__(self):
-        return self.status
     
 class Discipline(models.Model):
     discipline = models.CharField(max_length=150)
@@ -94,7 +88,6 @@ class Cart(models.Model):
 class Results(models.Model):
     place = models.IntegerField(null=True, blank=True)
     competitor = models.ForeignKey(Cart,  on_delete=models.CASCADE, null=True)
-    status = models.ForeignKey(Status, null=True, on_delete=models.SET_NULL, default=1)
     run1 = models.CharField(max_length=50, null=True, blank=True) 
     run2 = models.CharField(max_length=50, null=True, blank=True)
     run_total = models.CharField(max_length=50, null=True, blank=True)

@@ -144,14 +144,7 @@ class CartSerializer(serializers.ModelSerializer):
 
 class ResultsSerializer(serializers.ModelSerializer):
     cart_detail = CartSerializer(source='competitor', read_only=True)
-    status = serializers.CharField(source='status.status', read_only=True)
-    status_id = serializers.PrimaryKeyRelatedField(
-        queryset=Status.objects.all(), 
-        source='status', 
-        write_only=False  # Allow both read and write operations
-    )
-    DNF_ID = 2
-    DNS_ID = 3
+
     POINTS_TABLE = {
         1: 25, 2: 20, 3: 15, 4: 12, 5: 11,
         6: 10, 7: 9, 8: 8, 9: 7, 10: 6,
@@ -179,12 +172,6 @@ class ResultsSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         response = super().to_representation(instance)
-
-        competitor_serializer = CompetitorSerializer(instance.competitor.competitor)
-        response['competitor'] = competitor_serializer.data
-
-
-
         # Include other fields from Results model
         response['id'] = instance.id
         response['place'] = instance.place
@@ -226,37 +213,35 @@ class ResultsSerializer(serializers.ModelSerializer):
         if 'run2' in validated_data:
             instance.run2 = validated_data.get('run2')
 
+        competitor_id = instance.competitor.competitor.id
+        season_id = instance.competitor.group.competition.stage.season.id
+
         # Calculate total run time only if both runs are provided
         if instance.run1 and instance.run2:
-            instance.run_total = self.sum_times(instance.run1, instance.run2)
-            self.recalculate_placements(instance)  # Call this only when both runs are available
+            if instance.run1 in ["DNF","DNS"] or instance.run2 in ["DNF","DNS"]:
+                instance.run_total = None
+            else:
+                instance.run_total = self.sum_times(instance.run1, instance.run2)
+                instance.point = self.POINTS_TABLE.get(instance.place, 0)
+
         elif instance.run1:
-            instance.run_total = instance.run1
-            self.recalculate_placements(instance)
+            if instance.run1 in ["DNF","DNS"]:
+                instance.run_total = None
+            else:
+                instance.run_total = instance.run1
+
         elif instance.run2:
-            instance.run_total = instance.run2
-            self.recalculate_placements(instance)
+            if instance.run2 in ["DNF","DNS"]:
+                instance.run_total = None
+            else:
+                instance.run_total = instance.run2
+                instance.point = self.POINTS_TABLE.get(instance.place, 0)
 
-        # Update status and set points accordingly
-        status = validated_data.get('status', instance.status)
-        instance.status = status
-        if status and status.id in [self.DNF_ID, self.DNS_ID]:
-            instance.point = 0
-            instance.place = 999  # Temporary high value
-        else:
-            # Normal point calculation
-            instance.point = self.POINTS_TABLE.get(instance.place, 0)
-
-        # Save the instance with updated data
         instance.save()
 
-        # Recalculate placements and season points for the group if status changes
-        if 'status' in validated_data:
-            self.recalculate_placements(instance)
-            competitor_id = instance.competitor.competitor.id
-            season_id = instance.competitor.group.competition.stage.season.id
-            self.recalculate_season_points(competitor_id, season_id)
-            self.recalculate_all_season_points(season_id)
+        self.recalculate_placements(instance)
+        self.recalculate_season_points(competitor_id, season_id)
+        self.recalculate_all_season_points(season_id)
 
         return instance
 
@@ -268,19 +253,17 @@ class ResultsSerializer(serializers.ModelSerializer):
 
         normal_placement = 1
         for result in all_results:
-            if result.status.id not in [self.DNF_ID, self.DNS_ID]:
+            if result.run1 not in ["DNF","DNS"] and result.run2 not in ["DNF","DNS"]:
                 result.place = normal_placement
                 normal_placement += 1
                 result.point = self.POINTS_TABLE.get(result.place, 0)
-                result.save(update_fields=['place', 'point'])
-
-        # Handle DNF and DNS after assigning placements to others
-        for result in all_results:
-            if result.status.id in [self.DNF_ID, self.DNS_ID]:
+            else:
                 result.place = normal_placement
                 result.point = 0
                 normal_placement += 1
-                result.save(update_fields=['place', 'point'])
+
+            result.save(update_fields=['place', 'point'])
+            
 
     def recalculate_season_points(self, competitor_id, season_id):
         # Sum all points earned by this competitor in this season

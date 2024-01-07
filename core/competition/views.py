@@ -20,6 +20,16 @@ from django.http import HttpResponse
 from django.db.models import Prefetch
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image, Paragraph
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfgen import canvas
+import os
+from django.conf import settings
+from reportlab.lib.units import inch
 
 
 class ObtainAuthTokenView(APIView):
@@ -283,7 +293,6 @@ def randomize_bib_numbers(request):
 
 
 def create_result_for_cart(cart_id):
-    default_status, created = Status.objects.get_or_create(status='Active')
 
     try:
         cart = Cart.objects.get(pk=cart_id)
@@ -344,7 +353,6 @@ class SyncCartToResultsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def sync_cart_to_results():
-    default_status, created = Status.objects.get_or_create(status='Active')
 
     for cart in Cart.objects.all():
         if cart.competitor:
@@ -353,8 +361,7 @@ def sync_cart_to_results():
             if not result_exists:
                 try:
                     Results.objects.create(
-                        competitor=cart,
-                        status=default_status
+                        competitor=cart
                     )
                 except IntegrityError as e:
                     # Handle the exception or log it
@@ -415,3 +422,93 @@ def download_excel(request):
     return Response({"error": "Invalid request"}, status=400)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def download_pdf(request):
+    font_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'bpg_glaho_sylfaen.ttf')
+    try:
+        pdfmetrics.registerFont(TTFont('kartuli', font_path))
+    except Exception as e:
+        return Response({"error": f"Failed to register font: {str(e)}"}, status=500)
+    
+    def draw_header(canvas, doc):
+        logo_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'GSF-Logo.png')  # Replace with your logo path
+        logo = Image(logo_path, width=80, height=80)
+        logo.drawOn(canvas, doc.leftMargin - 40, doc.height + doc.topMargin - 30)
+
+        title = "Start List"
+        title_style = ParagraphStyle(name='TitleStyle', fontSize=16, alignment=1)
+        title_paragraph = Paragraph(title, title_style)
+        title_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
+        title_paragraph.drawOn(canvas, doc.width /2 - 160, doc.height + doc.topMargin)
+
+        date_text = "Date: " + str(datetime.now().strftime('%Y-%m-%d'))
+        date_paragraph = Paragraph(date_text, title_style)
+        date_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
+        date_paragraph.drawOn(canvas, doc.width - doc.rightMargin - 110, doc.height + doc.topMargin)
+
+    
+    if request.method == 'POST':
+        cart_ids = request.data.get('cartIds', [])
+        groups_with_carts = Group.objects.prefetch_related(
+            Prefetch('cart_set', queryset=Cart.objects.filter(id__in=cart_ids).order_by('bib_number'), to_attr='sorted_carts')
+        ).filter(cart__id__in=cart_ids).distinct().order_by('id')
+
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="Start_list.pdf"'
+
+        doc = SimpleDocTemplate(response, pagesize=letter, topMargin=1.5*inch)
+        elements = []
+
+        sky_color = colors.HexColor('#2F89D0')
+        sand_color = colors.HexColor('#b0caff')
+
+        page_width, page_height = letter
+        table_width = page_width * 0.9  # 80% of the page width
+        narrow_column_width = table_width / 10
+        wide_column_width = (table_width - 3 * narrow_column_width) / 2
+        column_widths = [table_width / 12, wide_column_width, narrow_column_width, narrow_column_width, wide_column_width]
+
+        for group in groups_with_carts:
+            # Group name header
+            group_name_data = [[group.group_name]]
+            group_name_table = Table(group_name_data, colWidths=[table_width])
+            group_name_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), sky_color),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONT', (0, 0), (-1, -1), 'kartuli',12),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+            ])
+            group_name_table.setStyle(group_name_style)
+            elements.append(group_name_table)
+            elements.append(Spacer(1, 12))
+
+            # Data table
+            data = [['BIB', 'სპორტსმენი', 'სქესი', 'წელი', 'სკოლა']]
+            for cart in group.sorted_carts:
+                data.append([
+                    cart.bib_number,
+                    f'{cart.competitor.name} {cart.competitor.surname}',
+                    cart.competitor.gender,
+                    cart.competitor.year,
+                    cart.competitor.school.school_name
+                ])
+
+            data_table = Table(data, colWidths=column_widths)
+            data_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), sand_color),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONT', (0, 0), (-1, -1), 'kartuli', 12),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+            ])
+            data_table.setStyle(data_style)
+            elements.append(data_table)
+            elements.append(Spacer(1, 12))
+
+        doc.build(elements, onFirstPage=draw_header)
+
+        return response
+
+    return Response({"error": "Invalid request"}, status=400)

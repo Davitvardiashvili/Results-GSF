@@ -261,7 +261,7 @@ def randomize_bib_numbers(request):
                 # Extend the potential range until there is no overlap
                 potential_numbers = set(range(start_number, start_number + total_carts + len(ignore_numbers)))
 
-            
+
             try:
                 start_number = max(potential_numbers) + 1
             except:
@@ -430,7 +430,7 @@ def download_pdf(request):
         pdfmetrics.registerFont(TTFont('kartuli', font_path))
     except Exception as e:
         return Response({"error": f"Failed to register font: {str(e)}"}, status=500)
-    
+
     def draw_header(canvas, doc):
         logo_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'GSF-Logo.png')  # Replace with your logo path
         logo = Image(logo_path, width=80, height=80)
@@ -447,7 +447,7 @@ def download_pdf(request):
         date_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
         date_paragraph.drawOn(canvas, doc.width - doc.rightMargin - 110, doc.height + doc.topMargin)
 
-    
+
     if request.method == 'POST':
         cart_ids = request.data.get('cartIds', [])
         groups_with_carts = Group.objects.prefetch_related(

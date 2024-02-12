@@ -29,13 +29,13 @@ class DisciplineSerializer(serializers.ModelSerializer):
 class CompetitorSerializer(serializers.ModelSerializer):
     # Use distinct names for write-only and read-only representations
     gender_id = serializers.PrimaryKeyRelatedField(
-        queryset=Gender.objects.all(), 
-        source='gender', 
+        queryset=Gender.objects.all(),
+        source='gender',
         write_only=True
     )
     school_id = serializers.PrimaryKeyRelatedField(
-        queryset=School.objects.all(), 
-        source='school', 
+        queryset=School.objects.all(),
+        source='school',
         write_only=True
     )
     gender = serializers.CharField(source='gender.gender', read_only=True)
@@ -75,8 +75,8 @@ class CompetitionDaySerializer(serializers.ModelSerializer):
         source='discipline',
         write_only=True,
     )
-    stage = StageSerializer(read_only=True) 
-    discipline = DisciplineSerializer(read_only=True) 
+    stage = StageSerializer(read_only=True)
+    discipline = DisciplineSerializer(read_only=True)
 
     class Meta:
         model = CompetitionDay
@@ -84,14 +84,14 @@ class CompetitionDaySerializer(serializers.ModelSerializer):
 
 class GroupSerializer(serializers.ModelSerializer):
     gender_id = serializers.PrimaryKeyRelatedField(
-        queryset=Gender.objects.all(), 
-        source='gender', 
+        queryset=Gender.objects.all(),
+        source='gender',
         write_only=True
     )
 
     competition_id = serializers.PrimaryKeyRelatedField(
-        queryset=CompetitionDay.objects.all(), 
-        source='competition', 
+        queryset=CompetitionDay.objects.all(),
+        source='competition',
         write_only=True
     )
 
@@ -106,14 +106,14 @@ class GroupSerializer(serializers.ModelSerializer):
 class CartSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
     competitor_id = serializers.PrimaryKeyRelatedField(
-        queryset=Competitor.objects.all(), 
-        source='competitor', 
+        queryset=Competitor.objects.all(),
+        source='competitor',
         write_only=True
     )
 
     group_id = serializers.PrimaryKeyRelatedField(
-        queryset=Group.objects.all(), 
-        source='group', 
+        queryset=Group.objects.all(),
+        source='group',
         write_only=True
     )
     group = GroupSerializer(read_only=True)
@@ -250,6 +250,10 @@ class ResultsSerializer(serializers.ModelSerializer):
             competitor__group=instance.competitor.group
         ).order_by('run_total')
 
+        all_results_count = Results.objects.filter(
+            competitor__group=instance.competitor.group
+        ).order_by('run_total').count()
+
         normal_placement = 1
         for result in all_results:
             if result.run1 not in ["DNF","DNS"] and result.run2 not in ["DNF","DNS"]:
@@ -257,17 +261,17 @@ class ResultsSerializer(serializers.ModelSerializer):
                 normal_placement += 1
                 result.point = self.POINTS_TABLE.get(result.place, 0)
             else:
-                result.place = normal_placement
+                result.place = all_results_count
                 result.point = 0
-                normal_placement += 1
+                all_results_count -= 1
 
             result.save(update_fields=['place', 'point'])
-            
+
 
     def recalculate_season_points(self, competitor_id, season_id):
         # Sum all points earned by this competitor in this season
         season_points = Results.objects.filter(
-            competitor__competitor__id=competitor_id, 
+            competitor__competitor__id=competitor_id,
             competitor__group__competition__stage__season__id=season_id
         ).aggregate(Sum('point'))['point__sum'] or 0
 

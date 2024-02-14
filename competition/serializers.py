@@ -123,19 +123,30 @@ class CartSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate(self, data):
-        """
-        Check that the competition and competitor combination is unique.
-        """
+        group = data.get('group')
+        competitor = data.get('competitor')
+
+        # Check if the group and competitor have compatible genders
+        if group.gender != competitor.gender:
+            raise serializers.ValidationError("Group and competitor have incompatible genders.")
+
+        # Check if the competitor's birth year is within the group's year range
+        group_start_year, group_end_year = map(int, group.group_name.split()[1].split('-'))
+        competitor_birth_year = competitor.year
+        if competitor_birth_year == group_start_year or competitor_birth_year == group_end_year:
+            pass
+        else:
+            raise serializers.ValidationError("Competitor's birth year is not within the group's year range.")
+
+
+        # Your existing code for checking uniqueness
         group_id = data.get('group')
         competitor_id = data.get('competitor')
 
-        # Check if we're creating a new instance or updating an existing one
         if not self.instance:
-            # This is a new instance, so we check if the combination already exists
             if Cart.objects.filter(group=group_id, competitor=competitor_id).exists():
                 raise serializers.ValidationError("A result for this group and competitor already exists.")
         else:
-            # This is an update, check if the combination exists elsewhere
             if Cart.objects.exclude(pk=self.instance.pk).filter(group=group_id, competitor=competitor_id).exists():
                 raise serializers.ValidationError("A result for this group and competitor already exists with a different ID.")
 

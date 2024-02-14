@@ -64,9 +64,13 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 
-if 'DATABASE_URL' in os.environ:  # Check if running on Heroku
-    import dj_database_url
-    DATABASES = {'default': dj_database_url.config(default=os.environ['DATABASE_URL'])}
+if 'DATABASE_URL' in os.environ:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.environ['DATABASE_URL'],
+        }
+    }
 else:
     DATABASES = {
         'default': {

@@ -64,12 +64,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-	'NAME': BASE_DIR / 'db.sqlite3',
+if 'DATABASE_URL' in os.environ:  # Check if running on Heroku
+    import dj_database_url
+    DATABASES = {'default': dj_database_url.config(default=os.environ['DATABASE_URL'])}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
 
 AUTH_PASSWORD_VALIDATORS = [

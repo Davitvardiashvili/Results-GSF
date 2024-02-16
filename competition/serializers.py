@@ -131,12 +131,12 @@ class CartSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Group and competitor have incompatible genders.")
 
         # Check if the competitor's birth year is within the group's year range
-        group_start_year, group_end_year = map(int, group.group_name.split()[1].split('-'))
-        competitor_birth_year = competitor.year
-        if competitor_birth_year == group_start_year or competitor_birth_year == group_end_year:
-            pass
-        else:
-            raise serializers.ValidationError("Competitor's birth year is not within the group's year range.")
+        # group_start_year, group_end_year = map(int, group.group_name.split()[1].split('-'))
+        # competitor_birth_year = competitor.year
+        # if competitor_birth_year == group_start_year or competitor_birth_year == group_end_year:
+        #     pass
+        # else:
+        #     raise serializers.ValidationError("Competitor's birth year is not within the group's year range.")
 
 
         # Your existing code for checking uniqueness

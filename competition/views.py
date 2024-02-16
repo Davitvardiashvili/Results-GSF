@@ -424,6 +424,107 @@ def download_excel(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def download_results_pdf(request):
+    font_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'bpg_glaho_sylfaen.ttf')
+    try:
+        pdfmetrics.registerFont(TTFont('kartuli', font_path))
+    except Exception as e:
+        print(f"Failed to register font: {str(e)}")
+        return Response({"error": f"Failed to register font: {str(e)}"}, status=500)
+
+
+
+    def draw_header(canvas, doc):
+        logo_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'GSF-Logo.png')  # Replace with your logo path
+        logo = Image(logo_path, width=80, height=80)
+        logo.drawOn(canvas, doc.leftMargin - 40, doc.height + doc.topMargin - 30)
+
+        title = "Result List"
+        title_style = ParagraphStyle(name='TitleStyle', fontSize=16, alignment=1)
+        title_paragraph = Paragraph(title, title_style)
+        title_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
+        title_paragraph.drawOn(canvas, doc.width /2 - 160, doc.height + doc.topMargin)
+
+        date_text = "Date: " + str(datetime.now().strftime('%Y-%m-%d'))
+        date_paragraph = Paragraph(date_text, title_style)
+        date_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
+        date_paragraph.drawOn(canvas, doc.width - doc.rightMargin - 110, doc.height + doc.topMargin)
+
+    if request.method == 'POST':
+        results_ids = request.data.get('resultIds', [])
+
+    # Fetch results based on the order specified by the frontend
+        results_data = Results.objects.filter(id__in=results_ids)
+        results_data_dict = {result.id: result for result in results_data}
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = 'attachment; filename="Results.pdf"'
+
+        doc = SimpleDocTemplate(response, pagesize=letter, topMargin=1.5*inch)
+        elements = []
+
+        sky_color = colors.HexColor('#2F89D0')
+        sand_color = colors.HexColor('#b0caff')
+
+        page_width, page_height = letter
+        table_width = page_width * 0.9  # 80% of the page width
+        column_widths = [table_width / 20, table_width / 20, table_width / 4, table_width / 10, table_width / 16, table_width / 16, table_width / 8]
+
+        groups_with_results = Group.objects.filter(cart__results__id__in=results_ids).distinct().order_by('id')
+
+        for group in groups_with_results:
+            # Your existing code for drawing the header and table for each group
+            group_name_data = [[group.group_name]]
+            group_name_table = Table(group_name_data, colWidths=[table_width])
+            group_name_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), sky_color),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONT', (0, 0), (-1, -1), 'kartuli', 12),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+            ])
+            group_name_table.setStyle(group_name_style)
+            elements.append(group_name_table)
+            elements.append(Spacer(1, 12))
+
+            data = [['Rank', 'BIB', 'სპორტსმენი', 'სკოლა', 'წელი', 'სქესი', 'დრო1', 'დრო2', 'ჯამური დრო']]
+
+            # Use the result IDs specified by the frontend and filter for each group
+            for result_id in results_ids:
+                result = results_data_dict.get(result_id)
+                if result and result.competitor.group == group:
+                    data.append([
+                        result.place,
+                        result.competitor.bib_number,
+                        f'{result.competitor.competitor.name} {result.competitor.competitor.surname}',
+                        result.competitor.competitor.school.school_name,
+                        result.competitor.competitor.year,
+                        result.competitor.competitor.gender,
+                        result.run1,
+                        result.run2,
+                        result.run_total
+                    ])
+
+            data_table = Table(data, colWidths=column_widths)
+            data_style = TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), sand_color),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONT', (0, 0), (-1, -1), 'kartuli', 8),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE')
+            ])
+            data_table.setStyle(data_style)
+            elements.append(data_table)
+            elements.append(Spacer(1, 12))
+
+        doc.build(elements, onFirstPage=draw_header)
+
+        return response
+
+    return Response({"error": "Invalid request"}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def download_pdf(request):
     font_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'bpg_glaho_sylfaen.ttf')
     try:

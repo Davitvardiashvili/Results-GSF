@@ -65,18 +65,16 @@ TEMPLATES = [
 WSGI_APPLICATION = 'core.wsgi.application'
 
 
-# if 'DATABASE_URL' in os.environ:
-#     DATABASES = {
-#         'default': dj_database_url.config(default=os.environ['DATABASE_URL'])
+''' For Local testing use this'''
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / "db.sqlite3",
 #     }
-# else:
-#     DATABASES = {
-#         'default': {
-#             'ENGINE': 'django.db.backends.sqlite3',
-#             'NAME': BASE_DIR / "db.sqlite3",
-#         }
-#     }
+# }
 
+
+''' For Deploying use this'''
 DATABASES = {'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))}
 
 
@@ -162,12 +160,15 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # settings.py
-
+'''For Deploying use this'''
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
+   os.path.join(BASE_DIR, "static"),
 ]
 
+'''For local use this'''
+# STATIC_URL = 'static/'
 
+'''For Deploying use this'''
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 

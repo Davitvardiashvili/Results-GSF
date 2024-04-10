@@ -232,6 +232,22 @@ class ResultsRetrieveUpdateDestroy(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
 
+
+class SearchResultsAPIView(generics.ListAPIView):
+    serializer_class = ResultsSerializer
+
+    def get_queryset(self):
+        queryset = Results.objects.all()
+        season = self.request.query_params.get('season')
+        stage = self.request.query_params.get('stage')
+        discipline = self.request.query_params.get('discipline')
+        if season and stage and discipline:
+            queryset = queryset.filter(season_name=season, stage_name=stage, discipline_name=discipline)
+        return queryset
+    
+
+    
+
 @swagger_auto_schema(method='post', request_body=RandomizeBibNumbersSerializer)
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -300,7 +316,22 @@ def create_result_for_cart(cart_id):
 
         if not result_exists:
             Results.objects.create(
-                competitor=cart
+                competitor=cart,
+                competitor_info={"name":cart.competitor.name,
+                                 "surname":cart.competitor.surname,
+                                 "school":cart.competitor.school.school_name,
+                                 "year":cart.competitor.year,
+                                 "gender":cart.competitor.gender.id},
+                group=cart.group,
+                group_name=cart.group.group_name,
+                stage_name=cart.group.competition.stage.name,
+                season=cart.group.competition.stage.season,
+                season_name=cart.group.competition.stage.season.season,
+                discipline=cart.group.competition.discipline,
+                discipline_name=cart.group.competition.discipline.discipline,
+                competition=cart.group.competition,
+                bib_number=cart.bib_number,
+                stage=cart.group.competition.stage
             )
         else:
             # If a result already exists, you may want to handle this case accordingly
@@ -323,6 +354,7 @@ def create_result_for_cart(cart_id):
 @permission_classes([IsAuthenticated])
 def batch_sync_results(request):
     cart_ids = request.data.get('cart_ids', [])
+    print("avoieeeee")
 
     # Iterate over cart IDs and create results
     for cart_id in cart_ids:
@@ -353,10 +385,11 @@ class SyncCartToResultsView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 def sync_cart_to_results():
-
+    print("aeeee")
     for cart in Cart.objects.all():
         if cart.competitor:
             result_exists = Results.objects.filter(competitor=cart).exists()
+
 
             if not result_exists:
                 try:

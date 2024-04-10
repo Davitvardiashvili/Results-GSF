@@ -154,7 +154,7 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 class ResultsSerializer(serializers.ModelSerializer):
-    cart_detail = CartSerializer(source='competitor', read_only=True)
+    
 
     POINTS_TABLE = {
         1: 25, 2: 20, 3: 15, 4: 10, 5: 8,

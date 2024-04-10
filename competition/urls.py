@@ -49,6 +49,7 @@ urlpatterns = [
     path('download_pdf/', download_pdf, name='download_pdf'),
     path('download_results_pdf/', download_results_pdf, name='download_results_pdf'),
     path('batch_sync_results/', batch_sync_results, name='batch-sync-results'),
+    path('search-results/', SearchResultsAPIView.as_view(), name='search-results'),
 
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     re_path(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),

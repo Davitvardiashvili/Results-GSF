@@ -473,7 +473,7 @@ def download_results_pdf(request):
         logo.drawOn(canvas, doc.leftMargin - 40, doc.height + doc.topMargin - 30)
 
         title = "საქართველოს ჩემპიონატი - სპეციალური სლალომი"
-        title_style = ParagraphStyle('FONT', (0, 0), (-1, -1), 'kartuli', 16)
+        title_style = ParagraphStyle(name='TitleStyle', fontSize=16, alignment=1,fontName='kartuli')
         title_paragraph = Paragraph(title, title_style)
         title_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
         title_paragraph.drawOn(canvas, doc.width /2 - 160, doc.height + doc.topMargin)

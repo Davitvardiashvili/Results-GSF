@@ -472,11 +472,20 @@ def download_results_pdf(request):
         logo = Image(logo_path, width=80, height=80)
         logo.drawOn(canvas, doc.leftMargin - 40, doc.height + doc.topMargin - 30)
 
-        title = "საქართველოს ჩემპიონატი გიგანტური სლალომი"
-        title_style = ParagraphStyle(name='TitleStyle', fontSize=15, alignment=1,fontName='kartuli')
-        title_paragraph = Paragraph(title, title_style)
-        title_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
-        title_paragraph.drawOn(canvas, doc.width /2 - 160, doc.height + doc.topMargin)
+        title_line1 = "საქართველოს ჩემპიონატი"
+        title_line2 = "სპეციალური სლალომი"
+
+        title_style = ParagraphStyle(name='TitleStyle', fontSize=15, alignment=1, fontName='kartuli')
+
+        # Create and draw the first line of the title
+        title_line1_paragraph = Paragraph(title_line1, title_style)
+        title_line1_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
+        title_line1_paragraph.drawOn(canvas, doc.width / 2 - 160, doc.height + doc.topMargin)
+
+        # Create and draw the second line of the title
+        title_line2_paragraph = Paragraph(title_line2, title_style)
+        title_line2_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
+        title_line2_paragraph.drawOn(canvas, doc.width / 2 - 160, doc.height + doc.topMargin - title_line1_paragraph.height - 20)
 
         # date_text = "Date: " + str(datetime.now().strftime('%Y-%m-%d'))
         date_text = '2024-04-13'

@@ -472,14 +472,14 @@ def download_results_pdf(request):
         logo = Image(logo_path, width=80, height=80)
         logo.drawOn(canvas, doc.leftMargin - 40, doc.height + doc.topMargin - 30)
 
-        title = "საქართველოს ჩემპიონატი \nსპეციალური სლალომი"
+        title = "საქართველოს ჩემპიონატი გიგანტური სლალომი"
         title_style = ParagraphStyle(name='TitleStyle', fontSize=15, alignment=1,fontName='kartuli')
         title_paragraph = Paragraph(title, title_style)
         title_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
         title_paragraph.drawOn(canvas, doc.width /2 - 160, doc.height + doc.topMargin)
 
         # date_text = "Date: " + str(datetime.now().strftime('%Y-%m-%d'))
-        date_text = '2024-04-12'
+        date_text = '2024-04-13'
         date_paragraph = Paragraph(date_text, title_style)
         date_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
         date_paragraph.drawOn(canvas, doc.width - doc.rightMargin - 110, doc.height + doc.topMargin)

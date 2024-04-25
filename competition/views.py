@@ -488,7 +488,7 @@ def download_results_pdf(request):
         title_line2_paragraph.drawOn(canvas, doc.width / 2 - 160, doc.height + doc.topMargin - title_line1_paragraph.height - 20)
 
         # date_text = "Date: " + str(datetime.now().strftime('%Y-%m-%d'))
-        date_text = '2024-04-13'
+        date_text = '2024-04-12'
         date_paragraph = Paragraph(date_text, title_style)
         date_paragraph.wrapOn(canvas, doc.width, doc.topMargin)
         date_paragraph.drawOn(canvas, doc.width - doc.rightMargin - 110, doc.height + doc.topMargin)

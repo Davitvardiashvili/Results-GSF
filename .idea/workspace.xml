@@ -5,10 +5,25 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="dd66ced7-a18e-45e8-b1b0-4f6600a09e56" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/core/competition/serializers.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/core/competition/urls.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/core/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/core/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/core/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/core/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/competition/admin.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0001_initial.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0002_remove_results_status_delete_status.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0003_results_competition_id_results_group_id_and_more.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0004_rename_competition_id_results_competition_and_more.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0005_results_bib_number.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0006_results_stage.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0007_results_competitor_info.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0008_results_group_name_results_season_name_and_more.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/0009_results_discipline_results_discipline_name.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/migrations/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/competition/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/serializers.py" beforeDir="false" afterPath="$PROJECT_DIR$/competition/serializers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/urls.py" beforeDir="false" afterPath="$PROJECT_DIR$/competition/urls.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/competition/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/competition/views.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/db.sqlite3" beforeDir="false" afterPath="$PROJECT_DIR$/db.sqlite3" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -28,28 +43,53 @@
   <component name="MarkdownSettingsMigration">
     <option name="stateVersion" value="1" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 8
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8
+}</component>
   <component name="ProjectId" id="2YOGkmV9cstnr3xoZsP3IR7QeZL" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "D:/Desktop/Results-GSF",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/Desktop/Results-GSF&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
+  <component name="RunManager">
+    <configuration name="Results-GSF" type="Python.DjangoServer" factoryName="Django server">
+      <module name="Results-GSF" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="launchJavascriptDebuger" value="false" />
+      <option name="port" value="8000" />
+      <option name="host" value="" />
+      <option name="additionalOptions" value="" />
+      <option name="browserUrl" value="" />
+      <option name="runTestServer" value="false" />
+      <option name="runNoReload" value="false" />
+      <option name="useCustomRunCommand" value="false" />
+      <option name="customRunCommand" value="" />
+      <method v="2" />
+    </configuration>
+  </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -59,6 +99,8 @@
       <option name="presentableId" value="Default" />
       <updated>1700389357710</updated>
       <workItem from="1700389358729" duration="13973000" />
+      <workItem from="1735805674027" duration="3898000" />
+      <workItem from="1735826915541" duration="3302000" />
     </task>
     <servers />
   </component>

@@ -395,12 +395,23 @@ class ResultSerializer(serializers.ModelSerializer):
 
         completed.sort(key=lambda x: convert_time_str(x.total_time))
 
+        # Assign same place and same points to all competitors with identical time (ties).
+        # Next place after a tie is the next number (e.g. 5, 5, then 6).
         place_counter = 1
-        for r in completed:
-            r.place = place_counter
-            r.points = self.POINTS_TABLE.get(place_counter, 0)
-            r.save(update_fields=['place', 'points'])
-            place_counter += 1
+        i = 0
+        while i < len(completed):
+            j = i
+            while j < len(completed) and completed[j].total_time == completed[i].total_time:
+                j += 1
+            tie_group = completed[i:j]
+            place = place_counter
+            pts = self.POINTS_TABLE.get(place, 0)
+            for r in tie_group:
+                r.place = place
+                r.points = pts
+                r.save(update_fields=['place', 'points'])
+            place_counter += 1  # next place is 6 after 5,5 not 7
+            i = j
 
         # DNF => after finishers
         for idx, r in enumerate(dnfs, start=place_counter):

@@ -21,13 +21,13 @@ from datetime import datetime, timedelta
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image, Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfgen import canvas
-from reportlab.lib.units import inch
+from reportlab.lib.units import inch, cm
 from django.conf import settings
 
 # Import your models and serializers
@@ -978,6 +978,51 @@ def download_results_pdf(request):
 
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def recalc_season_points(request):
+    """
+    POST /api/recalc-season-points/?season=2024-2025
+
+    Re-aggregates each competitor's season_points for the given season,
+    excluding Results from CompetitionDays where is_season_off=True.
+    Writes the sum back onto every Result.season_points for that competitor.
+    """
+    season_name = request.query_params.get('season') or request.data.get('season')
+    if not season_name:
+        return Response({"error": "Missing ?season=XXXX-YYYY param"}, status=400)
+
+    try:
+        season_obj = Season.objects.get(season=season_name)
+    except Season.DoesNotExist:
+        return Response({"error": f"No Season named {season_name} found"}, status=404)
+
+    season_results = Result.objects.filter(
+        registration__competition_day__stage__season=season_obj
+    )
+
+    competitor_ids = set(
+        season_results.values_list('registration__competitor_id', flat=True)
+    )
+
+    updated_competitors = 0
+    for comp_id in competitor_ids:
+        comp_results = season_results.filter(registration__competitor_id=comp_id)
+        total = (
+            comp_results
+            .filter(registration__competition_day__is_season_off=False)
+            .aggregate(Sum('points'))['points__sum']
+        ) or 0
+        comp_results.update(season_points=total)
+        updated_competitors += 1
+
+    return Response({
+        "season": season_name,
+        "competitors_updated": updated_competitors,
+        "results_touched": season_results.count(),
+    }, status=200)
+
+
 @api_view(['GET'])
 @permission_classes([AllowAny])  # or IsAuthenticated if you prefer
 def season_winners(request):
@@ -998,7 +1043,7 @@ def season_winners(request):
     except Season.DoesNotExist:
         return Response({"error": f"No Season named {season_name} found"}, status=404)
 
-    # 2) Fetch all Results for that season
+    # 2) Fetch all Results for that season (excluding season-off days)
     season_results = (
         Result.objects
         .select_related(
@@ -1006,7 +1051,10 @@ def season_winners(request):
             'registration__age_group',
             'registration__competition_day__stage__season'
         )
-        .filter(registration__competition_day__stage__season=season_obj)
+        .filter(
+            registration__competition_day__stage__season=season_obj,
+            registration__competition_day__is_season_off=False,
+        )
     )
     if not season_results.exists():
         return Response({
@@ -1062,15 +1110,15 @@ def season_winners(request):
         # Build JSON sublist
         winners = []
         rank = 1
-        # We'll fetch competitor data from the DB
-        from .models import Competitor  # or wherever your competitor model is
+        cids = [c[0] for c in comp_list]
+        competitors_by_id = Competitor.objects.select_related('school').in_bulk(cids)
         for (cid, sum_p, sum_pl) in comp_list:
-            # get competitor's name
-            competitor_obj = Competitor.objects.get(pk=cid)
+            competitor_obj = competitors_by_id.get(cid)
             winners.append({
                 "competitor_id": cid,
-                "first_name": competitor_obj.first_name,
-                "last_name": competitor_obj.last_name,
+                "first_name": competitor_obj.first_name if competitor_obj else "",
+                "last_name": competitor_obj.last_name if competitor_obj else "",
+                "school": competitor_obj.school.name if competitor_obj and competitor_obj.school else "",
                 "season_points": sum_p,
                 "sum_places": sum_pl,
                 "ranking": rank
@@ -1085,3 +1133,402 @@ def season_winners(request):
         })
 
     return Response(final_result, status=200)
+
+
+# ---------------------------------------------------------------------------
+# Public PDF endpoints (day results & season winners) — shared styling helpers
+# ---------------------------------------------------------------------------
+
+def _ensure_kartuli_font():
+    font_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'bpg_glaho_sylfaen.ttf')
+    try:
+        pdfmetrics.registerFont(TTFont('kartuli', font_path))
+    except Exception:
+        pass
+
+
+def _ag_sort_key(ag):
+    gender_priority = 0 if (ag and ag.gender and ag.gender.name == 'ქალი') else 1
+    start_val = (ag.birth_year_start if ag else 0) or 0
+    return (gender_priority, -start_val)
+
+
+def _ag_range_str(ag):
+    if not ag:
+        return ""
+    if ag.birth_year_start is None and ag.birth_year_end is None:
+        return ""
+    if ag.birth_year_start is None:
+        return f"↓ - {ag.birth_year_end}"
+    if ag.birth_year_end is None:
+        return f"{ag.birth_year_start}+"
+    return f"{ag.birth_year_start}-{ag.birth_year_end}"
+
+
+# Brand palette (matches the web UI)
+_BRAND_NAVY = colors.HexColor('#0d2750')
+_BRAND_BLUE = colors.HexColor('#1c4b8a')
+_ROW_ALT = colors.HexColor('#fafcff')
+_BORDER = colors.HexColor('#d9e2ef')
+_HEADER_BG = colors.HexColor('#f4f7fb')
+_HEADER_TEXT = colors.HexColor('#2b3e5a')
+_ACCENT = colors.HexColor('#1F3B8A')
+_GOLD = colors.HexColor('#FFD65A')
+_SILVER = colors.HexColor('#e3e7ec')
+_BRONZE = colors.HexColor('#f0b080')
+
+
+def _medal_bg(place):
+    if place == 1:
+        return _GOLD
+    if place == 2:
+        return _SILVER
+    if place == 3:
+        return _BRONZE
+    return None
+
+
+def _build_brand_header(title, subtitle):
+    """Returns a drawing function that paints the GSF logo + title + date."""
+    logo_path = os.path.join(settings.BASE_DIR, 'competition/fonts', 'GSF-Logo.png')
+
+    def draw(canvas_obj, doc):
+        canvas_obj.saveState()
+        # Navy band across the top
+        canvas_obj.setFillColor(_BRAND_NAVY)
+        canvas_obj.rect(0, doc.pagesize[1] - 90, doc.pagesize[0], 90, stroke=0, fill=1)
+
+        # Logo on the left
+        if os.path.exists(logo_path):
+            try:
+                canvas_obj.drawImage(
+                    logo_path,
+                    doc.leftMargin,
+                    doc.pagesize[1] - 82,
+                    width=70, height=70,
+                    mask='auto', preserveAspectRatio=True,
+                )
+            except Exception:
+                pass
+
+        # Title
+        canvas_obj.setFillColor(colors.white)
+        canvas_obj.setFont('kartuli', 16)
+        canvas_obj.drawString(doc.leftMargin + 82, doc.pagesize[1] - 40, title or '')
+        if subtitle:
+            canvas_obj.setFont('kartuli', 10)
+            canvas_obj.setFillColor(colors.HexColor('#c7d5ea'))
+            canvas_obj.drawString(doc.leftMargin + 82, doc.pagesize[1] - 58, subtitle)
+
+        # Date (right)
+        canvas_obj.setFont('kartuli', 9)
+        canvas_obj.setFillColor(colors.HexColor('#c7d5ea'))
+        canvas_obj.drawRightString(
+            doc.pagesize[0] - doc.rightMargin,
+            doc.pagesize[1] - 40,
+            datetime.now().strftime('%Y-%m-%d %H:%M'),
+        )
+
+        # Page number footer
+        canvas_obj.setFont('kartuli', 8)
+        canvas_obj.setFillColor(colors.HexColor('#7a8aa4'))
+        canvas_obj.drawCentredString(
+            doc.pagesize[0] / 2, 0.75 * cm,
+            f"gsf.ge   •   გვ. {doc.page}",
+        )
+        canvas_obj.restoreState()
+
+    return draw
+
+
+def _group_header_table(total_width, title_left, title_right=""):
+    tbl = Table(
+        [[title_left, title_right]],
+        colWidths=[total_width * 0.7, total_width * 0.3],
+    )
+    tbl.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), _BRAND_BLUE),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
+        ('FONT', (0, 0), (-1, -1), 'kartuli', 11),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    return tbl
+
+
+def _data_table_style(num_rows, medal_rows=None):
+    """Shared table style: header row + zebra + grid; medal_rows = dict {row_index: colors.HexColor} to tint the rank cell."""
+    style = [
+        # Header
+        ('BACKGROUND', (0, 0), (-1, 0), _HEADER_BG),
+        ('TEXTCOLOR', (0, 0), (-1, 0), _HEADER_TEXT),
+        ('FONT', (0, 0), (-1, 0), 'kartuli', 9),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 7),
+        ('TOPPADDING', (0, 0), (-1, 0), 7),
+        ('LINEBELOW', (0, 0), (-1, 0), 1.2, _BORDER),
+
+        # Body
+        ('FONT', (0, 1), (-1, -1), 'kartuli', 9),
+        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#1a2a44')),
+        ('LINEABOVE', (0, 1), (-1, -1), 0.25, _BORDER),
+        ('LEFTPADDING', (0, 1), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 1), (-1, -1), 4),
+        ('TOPPADDING', (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+    ]
+    # Zebra stripes (every other body row)
+    for r in range(1, num_rows):
+        if r % 2 == 0:
+            style.append(('BACKGROUND', (0, r), (-1, r), _ROW_ALT))
+    # Medal tinting on rank cell (column 0)
+    if medal_rows:
+        for r, bg in medal_rows.items():
+            style.append(('BACKGROUND', (0, r), (0, r), bg))
+            style.append(('FONT', (0, r), (0, r), 'kartuli', 10))
+    return TableStyle(style)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def download_day_pdf(request):
+    """
+    GET /api/day-pdf/?date=YYYY-MM-DD
+    Returns a styled PDF of all results for that date.
+    """
+    date_str = request.GET.get('date')
+    if not date_str:
+        return Response({"error": "No date specified"}, status=400)
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return Response({"error": "Invalid date format, expected YYYY-MM-DD"}, status=400)
+
+    _ensure_kartuli_font()
+
+    results = (
+        Result.objects
+        .filter(registration__competition_day__date=date_obj)
+        .select_related(
+            'registration__competitor__school',
+            'registration__competition_day__discipline',
+            'registration__competition_day__stage__season',
+            'registration__age_group__gender',
+        )
+    )
+
+    if not results.exists():
+        return Response({"message": "No results for this date"}, status=404)
+
+    from collections import defaultdict, OrderedDict
+    day_map = OrderedDict()  # cday -> { ag -> [results] }
+    for r in results:
+        cday = r.registration.competition_day
+        ag = r.registration.age_group
+        day_map.setdefault(cday, {}).setdefault(ag, []).append(r)
+
+    # Sort results within each group by place (None at the end)
+    for cday, ag_map in day_map.items():
+        for ag in ag_map:
+            ag_map[ag].sort(key=lambda r: (r.place if r.place is not None else 999999))
+
+    # PDF setup
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="results-{date_str}.pdf"'
+
+    doc = SimpleDocTemplate(
+        response, pagesize=A4,
+        leftMargin=1.4 * cm, rightMargin=1.4 * cm,
+        topMargin=3.2 * cm, bottomMargin=1.6 * cm,
+    )
+    total_width = doc.width
+    elements = []
+
+    first_cday = next(iter(day_map.keys()))
+    title = f"შედეგები — {date_obj.strftime('%Y-%m-%d')}"
+    subtitle = f"{first_cday.stage.season.season} • {first_cday.stage.name}"
+    if first_cday.stage.location:
+        subtitle += f" • {first_cday.stage.location}"
+
+    col_widths = [
+        total_width * 0.07,   # Place
+        total_width * 0.07,   # BIB
+        total_width * 0.24,   # Name
+        total_width * 0.06,   # Year
+        total_width * 0.22,   # School
+        total_width * 0.10,   # Run1
+        total_width * 0.10,   # Run2
+        total_width * 0.14,   # Total
+    ]
+
+    for cday, ag_map in day_map.items():
+        day_title_left = f"{cday.discipline.name}"
+        day_title_right = cday.date.strftime('%Y-%m-%d')
+        elements.append(_group_header_table(total_width, day_title_left, day_title_right))
+        elements.append(Spacer(1, 6))
+        if cday.is_season_off:
+            note_style = ParagraphStyle(
+                name='SeasonOffNote', fontName='kartuli', fontSize=9,
+                textColor=colors.HexColor('#8a6d2a'),
+            )
+            elements.append(Paragraph(
+                "❄ სეზონგარეშე ტურნირი — ქულები სეზონის ჯამში არ ითვლება.",
+                note_style,
+            ))
+            elements.append(Spacer(1, 6))
+
+        for ag in sorted(ag_map.keys(), key=_ag_sort_key):
+            gender = ag.gender.name if (ag and ag.gender) else ''
+            ag_label = f"{gender} {_ag_range_str(ag)}".strip()
+            ag_tbl = Table([[ag_label]], colWidths=[total_width])
+            ag_tbl.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), _HEADER_BG),
+                ('TEXTCOLOR', (0, 0), (-1, -1), _BRAND_NAVY),
+                ('FONT', (0, 0), (-1, -1), 'kartuli', 10),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            elements.append(ag_tbl)
+
+            data = [['ადგილი', 'BIB', 'სპორტსმენი', 'წელი', 'სკოლა', 'რბ.1', 'რბ.2', 'ჯამური']]
+            medal_rows = {}
+            for r in ag_map[ag]:
+                comp = r.registration.competitor
+                data.append([
+                    r.place if r.place is not None else '',
+                    r.registration.bib_number or '',
+                    f"{comp.first_name} {comp.last_name}",
+                    comp.year_of_birth or '',
+                    (comp.school.name if comp.school else ''),
+                    r.run1_time or '',
+                    r.run2_time or '',
+                    r.total_time or '',
+                ])
+                bg = _medal_bg(r.place)
+                if bg is not None:
+                    medal_rows[len(data) - 1] = bg
+
+            tbl = Table(data, colWidths=col_widths, repeatRows=1)
+            tbl.setStyle(_data_table_style(len(data), medal_rows))
+            elements.append(tbl)
+            elements.append(Spacer(1, 14))
+
+    header_drawer = _build_brand_header(title, subtitle)
+    doc.build(elements, onFirstPage=header_drawer, onLaterPages=header_drawer)
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def download_season_winners_pdf(request):
+    """
+    GET /api/season-winners-pdf/?season=NAME
+    Returns a styled PDF of the seasonal standings (season-off days excluded).
+    """
+    season_name = request.GET.get('season')
+    if not season_name:
+        return Response({"error": "Missing ?season="}, status=400)
+    try:
+        season_obj = Season.objects.get(season=season_name)
+    except Season.DoesNotExist:
+        return Response({"error": f"No Season named {season_name}"}, status=404)
+
+    _ensure_kartuli_font()
+
+    season_results = (
+        Result.objects
+        .select_related(
+            'registration__competitor__school',
+            'registration__age_group__gender',
+            'registration__competition_day__stage__season',
+        )
+        .filter(
+            registration__competition_day__stage__season=season_obj,
+            registration__competition_day__is_season_off=False,
+        )
+    )
+
+    if not season_results.exists():
+        return Response({"message": "No results for this season"}, status=404)
+
+    from collections import defaultdict
+    ag_map = defaultdict(lambda: defaultdict(lambda: {"points": 0, "places": 0}))
+    for r in season_results:
+        ag = r.registration.age_group
+        if ag is None:
+            continue
+        cid = r.registration.competitor_id
+        ag_map[ag][cid]["points"] += (r.points or 0)
+        ag_map[ag][cid]["places"] += (r.place if r.place is not None else 999)
+
+    from .models import Competitor
+    all_cids = {cid for bucket in ag_map.values() for cid in bucket}
+    competitors = Competitor.objects.select_related('school').in_bulk(list(all_cids))
+
+    response = HttpResponse(content_type='application/pdf')
+    safe_slug = "".join(ch if ch.isalnum() or ch in '-_' else '_' for ch in season_name)
+    response['Content-Disposition'] = f'attachment; filename="season-winners-{safe_slug}.pdf"'
+
+    doc = SimpleDocTemplate(
+        response, pagesize=A4,
+        leftMargin=1.4 * cm, rightMargin=1.4 * cm,
+        topMargin=3.2 * cm, bottomMargin=1.6 * cm,
+    )
+    total_width = doc.width
+    elements = []
+
+    col_widths = [
+        total_width * 0.09,   # Rank
+        total_width * 0.36,   # Name
+        total_width * 0.28,   # School
+        total_width * 0.15,   # Points
+        total_width * 0.12,   # Sum places
+    ]
+
+    for ag in sorted(ag_map.keys(), key=_ag_sort_key):
+        gender = ag.gender.name if (ag and ag.gender) else ''
+        ag_label = f"{gender} {_ag_range_str(ag)}".strip()
+        elements.append(_group_header_table(total_width, ag_label, "სეზონის ცხრილი"))
+        elements.append(Spacer(1, 4))
+
+        items = sorted(
+            ag_map[ag].items(),
+            key=lambda kv: (-kv[1]["points"], kv[1]["places"]),
+        )
+
+        data = [['რანგი', 'სპორტსმენი', 'სკოლა', 'ქულა', 'ადგ. ჯამი']]
+        medal_rows = {}
+        for rank, (cid, sums) in enumerate(items, start=1):
+            c = competitors.get(cid)
+            if c is None:
+                continue
+            data.append([
+                rank,
+                f"{c.first_name} {c.last_name}",
+                (c.school.name if c.school else ''),
+                sums["points"],
+                sums["places"],
+            ])
+            bg = _medal_bg(rank)
+            if bg is not None:
+                medal_rows[len(data) - 1] = bg
+
+        tbl = Table(data, colWidths=col_widths, repeatRows=1)
+        tbl.setStyle(_data_table_style(len(data), medal_rows))
+        elements.append(tbl)
+        elements.append(Spacer(1, 14))
+
+    title = f"სეზონის საბოლოო ცხრილი"
+    subtitle = season_name
+    header_drawer = _build_brand_header(title, subtitle)
+    doc.build(elements, onFirstPage=header_drawer, onLaterPages=header_drawer)
+    return response

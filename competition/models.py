@@ -106,6 +106,10 @@ class CompetitionDay(models.Model):
     stage = models.ForeignKey(Stage, on_delete=models.CASCADE, related_name='competition_days')
     discipline = models.ForeignKey(Discipline, on_delete=models.CASCADE)
     date = models.DateField()
+    is_season_off = models.BooleanField(
+        default=False,
+        help_text="If true, points from this day are excluded from season_points totals."
+    )
     updated = models.DateTimeField(auto_now=True)
     created = models.DateTimeField(auto_now_add=True)
 

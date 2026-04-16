@@ -151,7 +151,8 @@ class CompetitionDaySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'stage_id', 'stage',
             'discipline_id', 'discipline',
-            'date', 'created', 'updated'
+            'date', 'is_season_off',
+            'created', 'updated'
         ]
 
 
@@ -426,6 +427,8 @@ class ResultSerializer(serializers.ModelSerializer):
     def recalc_all_season_points(self, results_queryset):
         """
         For each competitor in results_queryset, recalc their season sum.
+        Season-off competition days are excluded from the sum, but their
+        stored season_points are still updated to reflect the competitor's total.
         """
         # Distill unique competitor IDs
         competitor_ids = list(
@@ -433,17 +436,22 @@ class ResultSerializer(serializers.ModelSerializer):
         )
         competitor_ids = set(competitor_ids)
 
+        first = results_queryset.first()
+        if not first:
+            return
+        season = first.registration.competition_day.stage.season
+
         for comp_id in competitor_ids:
-            # Recalculate the sum of points for *this* competitor across the season
             competitor_results = Result.objects.filter(
                 registration__competitor_id=comp_id,
-                registration__competition_day__stage__season=(
-                    results_queryset.first().registration.competition_day.stage.season
-                )
+                registration__competition_day__stage__season=season,
             )
-            total_points = competitor_results.aggregate(Sum('points'))['points__sum'] or 0
+            total_points = (
+                competitor_results
+                .filter(registration__competition_day__is_season_off=False)
+                .aggregate(Sum('points'))['points__sum']
+            ) or 0
 
-            # Update them all with that new sum
             competitor_results.update(season_points=total_points)
 
 

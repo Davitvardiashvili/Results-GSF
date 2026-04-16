@@ -1,1 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local DB (kept in repo)
 !db.sqlite3
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Local-only
+staticfiles/

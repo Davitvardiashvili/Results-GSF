@@ -26,7 +26,8 @@ from .views import (
     SyncRegistrationToResultsView,  # if you’re still syncing registrations to results
     batch_sync_results,
     SearchResultsAPIView,
-    download_excel, download_pdf, download_results_pdf, results_by_date, season_winners
+    download_excel, download_pdf, download_results_pdf, results_by_date, season_winners,
+    recalc_season_points, download_day_pdf, download_season_winners_pdf
 )
 
 schema_view = get_schema_view(
@@ -111,6 +112,9 @@ urlpatterns = [
     path('download_results_pdf/', download_results_pdf, name='download_results_pdf'),
 
     path('season-winners/', season_winners, name='season-winners'),
+    path('recalc-season-points/', recalc_season_points, name='recalc-season-points'),
+    path('day-pdf/', download_day_pdf, name='day-pdf'),
+    path('season-winners-pdf/', download_season_winners_pdf, name='season-winners-pdf'),
 
     # ----------------------------
     # Swagger / Redoc
